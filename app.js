@@ -354,7 +354,7 @@ function updateVesselMarker(vessel) {
     const speed = vessel.speed !== undefined ? vessel.speed : 0;
     const status = vessel.navigationalStatus || '';
     const mmsi = vessel.mmsi;
-    const labelText = vessel.name ? vessel.name.trim() : '';
+    const labelText = vessel.name ? vessel.name.trim() : `${mmsi}`;
     
     if (!mmsi) {
         console.warn('⚠️ Vessel missing MMSI:', vessel);
