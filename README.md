@@ -1,4 +1,3 @@
-````markdown
 # Multi-Map Tracking
 
 A real-time dual-source tracking web application displaying live ADS-B aircraft and AIS vessel data on a full-screen OpenStreetMap with dark mode styling.
