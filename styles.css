@@ -1,0 +1,312 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+#map {
+    height: 100%;
+    width: 100%;
+    background-color: #1a1a1a;
+}
+
+/* Info panel styling */
+#info-panel {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(26, 26, 26, 0.9);
+    color: #ffffff;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    min-width: 200px;
+}
+
+#aircraft-count {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #4CAF50;
+}
+
+#last-update {
+    font-size: 12px;
+    color: #b0b0b0;
+}
+
+/* Leaflet popup styling for dark mode */
+.leaflet-popup-content-wrapper {
+    background-color: #2d2d2d;
+    color: #ffffff;
+}
+
+.leaflet-popup-tip {
+    background-color: #2d2d2d;
+}
+
+.leaflet-popup-content {
+    margin: 10px 15px;
+}
+
+.popup-content {
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.popup-content strong {
+    color: #4CAF50;
+}
+
+/* Leaflet controls dark mode styling */
+.leaflet-control-zoom a {
+    background-color: #2d2d2d;
+    color: #ffffff;
+}
+
+.leaflet-control-zoom a:hover {
+    background-color: #3d3d3d;
+}
+
+.leaflet-control-attribution {
+    background-color: rgba(26, 26, 26, 0.8);
+    color: #b0b0b0;
+}
+
+.leaflet-control-attribution a {
+    color: #4CAF50;
+}
+
+/* Aircraft icon styling */
+.aircraft-icon-wrapper {
+    background: transparent;
+    border: none;
+}
+
+.aircraft-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.aircraft-marker {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease-in-out;
+    flex-shrink: 0;
+}
+
+.aircraft-marker i {
+    font-size: 24px;
+    color: #4CAF50;
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8),
+                 0 0 6px rgba(76, 175, 80, 0.4);
+    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.3));
+}
+
+/* Tooltip labels for aircraft */
+.aircraft-label-tooltip {
+    background-color: rgba(26, 26, 26, 0.9) !important;
+    border: 1px solid rgba(76, 175, 80, 0.3) !important;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.6) !important;
+    color: #4CAF50 !important;
+    font-family: 'B612', sans-serif !important;
+    font-size: 10px !important;
+    font-weight: 500 !important;
+    padding: 3px 8px !important;
+    border-radius: 3px !important;
+    letter-spacing: 0.5px !important;
+}
+
+/* Tooltip labels for vessels */
+.vessel-label-tooltip {
+    background-color: rgba(26, 26, 26, 0.9) !important;
+    border: 1px solid rgba(100, 181, 246, 0.3) !important;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.6) !important;
+    color: #64B5F6 !important;
+    font-family: 'B612', sans-serif !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    padding: 3px 8px !important;
+    border-radius: 3px !important;
+    letter-spacing: 0.5px !important;
+}
+
+/* Remove default Leaflet tooltip arrows */
+.aircraft-label-tooltip::before,
+.vessel-label-tooltip::before,
+.leaflet-tooltip-left.aircraft-label-tooltip::before,
+.leaflet-tooltip-left.vessel-label-tooltip::before,
+.leaflet-tooltip-right.aircraft-label-tooltip::before,
+.leaflet-tooltip-right.vessel-label-tooltip::before,
+.leaflet-tooltip-top.aircraft-label-tooltip::before,
+.leaflet-tooltip-top.vessel-label-tooltip::before,
+.leaflet-tooltip-bottom.aircraft-label-tooltip::before,
+.leaflet-tooltip-bottom.vessel-label-tooltip::before {
+    display: none !important;
+}
+
+/* Leader lines using ::after pseudo-element */
+.aircraft-label-tooltip.label-right::after,
+.vessel-label-tooltip.label-right::after {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 50%;
+    width: 20px;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.6;
+}
+
+.aircraft-label-tooltip.label-left::after,
+.vessel-label-tooltip.label-left::after {
+    content: '';
+    position: absolute;
+    right: -20px;
+    top: 50%;
+    width: 20px;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.6;
+}
+
+.aircraft-label-tooltip.label-top::after,
+.vessel-label-tooltip.label-top::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: -20px;
+    width: 1px;
+    height: 20px;
+    background: currentColor;
+    opacity: 0.6;
+}
+
+.aircraft-label-tooltip.label-bottom::after,
+.vessel-label-tooltip.label-bottom::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: -20px;
+    width: 1px;
+    height: 20px;
+    background: currentColor;
+    opacity: 0.6;
+}
+
+/* Diagonal leader lines */
+.aircraft-label-tooltip.label-topright::after,
+.vessel-label-tooltip.label-topright::after {
+    content: '';
+    position: absolute;
+    left: -15px;
+    bottom: -15px;
+    width: 22px;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.6;
+    transform: rotate(-45deg);
+    transform-origin: left center;
+}
+
+.aircraft-label-tooltip.label-topleft::after,
+.vessel-label-tooltip.label-topleft::after {
+    content: '';
+    position: absolute;
+    right: -15px;
+    bottom: -15px;
+    width: 22px;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.6;
+    transform: rotate(45deg);
+    transform-origin: right center;
+}
+
+.aircraft-label-tooltip.label-bottomright::after,
+.vessel-label-tooltip.label-bottomright::after {
+    content: '';
+    position: absolute;
+    left: -15px;
+    top: -15px;
+    width: 22px;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.6;
+    transform: rotate(45deg);
+    transform-origin: left center;
+}
+
+.aircraft-label-tooltip.label-bottomleft::after,
+.vessel-label-tooltip.label-bottomleft::after {
+    content: '';
+    position: absolute;
+    right: -15px;
+    top: -15px;
+    width: 22px;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.6;
+    transform: rotate(-45deg);
+    transform-origin: right center;
+}
+
+/* Vessel marker styling */
+.vessel-icon-wrapper {
+    background: transparent;
+    border: none;
+}
+
+.vessel-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.vessel-marker {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.vessel-marker.vessel-dot {
+    width: 16px;
+    height: 16px;
+}
+
+/* Apply opacity to the entire icon wrapper to prevent stacking */
+.vessel-icon-wrapper.vessel-dot {
+    opacity: 0.5 !important;
+}
+
+.vessel-icon-wrapper:not(.vessel-dot) {
+    opacity: 1 !important;
+}
+
+/* Static vessels - no glow, semi-transparent */
+.vessel-marker.vessel-dot svg {
+    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.5));
+}
+
+/* Moving vessels - with blue glow */
+.vessel-marker:not(.vessel-dot) svg {
+    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8))
+            drop-shadow(0 0 4px rgba(100, 181, 246, 0.4));
+}
