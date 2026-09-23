@@ -144,124 +144,39 @@ html, body {
     letter-spacing: 0.5px !important;
 }
 
-/* Remove default Leaflet tooltip arrows */
-.aircraft-label-tooltip::before,
-.vessel-label-tooltip::before,
-.leaflet-tooltip-left.aircraft-label-tooltip::before,
-.leaflet-tooltip-left.vessel-label-tooltip::before,
-.leaflet-tooltip-right.aircraft-label-tooltip::before,
-.leaflet-tooltip-right.vessel-label-tooltip::before,
-.leaflet-tooltip-top.aircraft-label-tooltip::before,
-.leaflet-tooltip-top.vessel-label-tooltip::before,
-.leaflet-tooltip-bottom.aircraft-label-tooltip::before,
-.leaflet-tooltip-bottom.vessel-label-tooltip::before {
+/* Managed labels use center anchoring and measured screen-space bounds. */
+.managed-label {
+    margin: 0 !important;
+    white-space: nowrap;
+    pointer-events: none;
+    visibility: hidden !important;
+}
+
+.managed-label.label-placed {
+    visibility: visible !important;
+}
+
+.labels-moving .managed-label {
+    visibility: hidden !important;
+}
+
+.managed-label::before {
     display: none !important;
 }
 
-/* Leader lines using ::after pseudo-element */
-.aircraft-label-tooltip.label-right::after,
-.vessel-label-tooltip.label-right::after {
+/* Each leader joins the actual label border to its own marker. */
+.managed-label::after {
     content: '';
     position: absolute;
-    left: -20px;
-    top: 50%;
-    width: 20px;
+    left: var(--leader-x, 0px);
+    top: var(--leader-y, 0px);
+    width: var(--leader-length, 0px);
     height: 1px;
     background: currentColor;
     opacity: 0.6;
-}
-
-.aircraft-label-tooltip.label-left::after,
-.vessel-label-tooltip.label-left::after {
-    content: '';
-    position: absolute;
-    right: -20px;
-    top: 50%;
-    width: 20px;
-    height: 1px;
-    background: currentColor;
-    opacity: 0.6;
-}
-
-.aircraft-label-tooltip.label-top::after,
-.vessel-label-tooltip.label-top::after {
-    content: '';
-    position: absolute;
-    left: 50%;
-    bottom: -20px;
-    width: 1px;
-    height: 20px;
-    background: currentColor;
-    opacity: 0.6;
-}
-
-.aircraft-label-tooltip.label-bottom::after,
-.vessel-label-tooltip.label-bottom::after {
-    content: '';
-    position: absolute;
-    left: 50%;
-    top: -20px;
-    width: 1px;
-    height: 20px;
-    background: currentColor;
-    opacity: 0.6;
-}
-
-/* Diagonal leader lines */
-.aircraft-label-tooltip.label-topright::after,
-.vessel-label-tooltip.label-topright::after {
-    content: '';
-    position: absolute;
-    left: -15px;
-    bottom: -15px;
-    width: 22px;
-    height: 1px;
-    background: currentColor;
-    opacity: 0.6;
-    transform: rotate(-45deg);
-    transform-origin: left center;
-}
-
-.aircraft-label-tooltip.label-topleft::after,
-.vessel-label-tooltip.label-topleft::after {
-    content: '';
-    position: absolute;
-    right: -15px;
-    bottom: -15px;
-    width: 22px;
-    height: 1px;
-    background: currentColor;
-    opacity: 0.6;
-    transform: rotate(45deg);
-    transform-origin: right center;
-}
-
-.aircraft-label-tooltip.label-bottomright::after,
-.vessel-label-tooltip.label-bottomright::after {
-    content: '';
-    position: absolute;
-    left: -15px;
-    top: -15px;
-    width: 22px;
-    height: 1px;
-    background: currentColor;
-    opacity: 0.6;
-    transform: rotate(45deg);
-    transform-origin: left center;
-}
-
-.aircraft-label-tooltip.label-bottomleft::after,
-.vessel-label-tooltip.label-bottomleft::after {
-    content: '';
-    position: absolute;
-    right: -15px;
-    top: -15px;
-    width: 22px;
-    height: 1px;
-    background: currentColor;
-    opacity: 0.6;
-    transform: rotate(-45deg);
-    transform-origin: right center;
+    transform-origin: 0 0;
+    transform: rotate(var(--leader-angle, 0rad));
+    pointer-events: none;
 }
 
 /* Vessel marker styling */

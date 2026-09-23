@@ -6,7 +6,7 @@ A real-time dual-source tracking web application displaying live ADS-B aircraft 
 
 - **Full-screen dark mode map** using OpenStreetMap and CartoDB dark tiles
 - **Real-time dual-source tracking**: Aircraft (ADS-B) and vessels (AIS) with 1-second refresh
-- **Smart label collision avoidance** with 8-position auto-positioning system
+- **Measured label collision avoidance** with stable placement and decluttering in crowded areas
 - **Visible leader lines** connecting labels to markers
 - **Differential styling**: Bright moving objects with glow, faded stationary objects at 50% opacity
 - **Conditional label display**: Labels shown only for moving objects (speed ≥0.5 kts)
@@ -74,6 +74,8 @@ The proxy server will:
 - Fetch data from the ADS-B API and add CORS headers
 - Handle errors gracefully
 
+The map key is loaded from the local, Git-ignored `map-config.js` file. Copy `map-config.example.js` to `map-config.js` and add your key there. The key is still visible to browser users; this only keeps it out of the repository.
+
 2. **Open your browser** and navigate to:
 
 ```
@@ -130,10 +132,17 @@ Works on all modern browsers:
 ### Label Collision Avoidance
 
 The application automatically positions labels to avoid overlaps:
-- Each label can be placed in 8 positions: right, left, top, bottom, and 4 diagonals
-- A rectangle overlap detection algorithm finds the best non-overlapping position
-- Labels are recalculated whenever the map is panned or zoomed
-- Visible leader lines connect labels to their markers
+- Measures each rendered label, including its font, padding and border
+- Tries 8 directions at increasing distances, avoiding other labels, all traffic icons, map controls and open popups
+- Keeps labels inside the viewport and preserves previous positions while they remain clear
+- Prioritizes aircraft, then faster traffic; temporarily hides labels that cannot fit without a clash
+- Keeps all markers and their clickable detail popups available, even when their labels are hidden
+- Reconsiders hidden labels after live updates, pan, zoom, resize, popup changes and font loading
+- Draws leader lines from label borders toward their markers
+
+`LABEL_GAP` and `LABEL_EDGE_PADDING` in `app.js` control spacing in pixels. The placement algorithm lives in `label-layout.js` and uses a spatial index to check nearby rectangles. Updates share one animation-frame layout, without a continuous physics simulation or rebuilding every tooltip.
+
+This handles the application's traffic labels. Text baked into the raster basemap cannot participate in collision detection. For a future renderer migration, [MapLibre GL JS symbol layers](https://maplibre.org/maplibre-gl-js/docs/examples/variable-label-placement/) provide built-in collision handling and variable label anchors; traffic markers and labels would need to become symbol layers to benefit.
 
 ### Dual-Source Integration
 
@@ -170,6 +179,8 @@ multi-map/
 ├── index.html                      # Main HTML file
 ├── styles.css                      # Styling and dark mode theme
 ├── app.js                         # Application logic and data handling
+├── label-layout.js                # Screen-space label placement
+├── tests/                         # Placement and application regression tests
 ├── proxy-server.py                # CORS proxy for ADS-B API
 ├── README.md                      # This file
 └── .github/
@@ -186,9 +197,20 @@ multi-map/
 - Hard refresh browser cache: `Cmd+Shift+R` (Mac) or `Ctrl+Shift+R` (Windows/Linux)
 
 ### Labels overlapping?
-- This shouldn't happen with the collision avoidance system. If it does:
-  - Hard refresh to ensure latest JavaScript is loaded
-  - Check browser console for JavaScript errors
+- Hard refresh to ensure the latest JavaScript and CSS are loaded.
+- In crowded areas, some labels are intentionally hidden. Zoom in to make room, or click a marker to read its details.
+- Traffic labels avoid one another; place names baked into map tiles are separate.
+- Check the browser console for JavaScript errors if traffic labels still overlap.
+
+## Tests
+
+Run the regression tests with Node.js 18 or newer (no dependencies to install):
+
+```bash
+node --test tests/*.test.js
+```
+
+Tests cover dense clusters, long names, viewport edges, label priorities, stable movement, resizing, font metrics, panning away and back, popup changes and vessel movement state. The application tests use a small DOM/Leaflet adapter; visual verification in a real browser is still useful.
 
 ### Performance issues?
 - The application is optimized to handle 100+ aircraft/vessels
