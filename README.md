@@ -6,7 +6,7 @@ A real-time dual-source tracking web application displaying live ADS-B aircraft 
 
 - **Full-screen dark mode map** using OpenStreetMap and CartoDB dark tiles
 - **Real-time dual-source tracking**: Aircraft (ADS-B) and vessels (AIS) with 1-second refresh
-- **Measured label collision avoidance** with stable placement and decluttering in crowded areas
+- **Measured label collision avoidance** with stable placement and visible labels even in crowded areas
 - **Visible leader lines** connecting labels to markers
 - **Differential styling**: Bright moving objects with glow, faded stationary objects at 50% opacity
 - **Conditional label display**: Labels shown only for moving objects (speed ≥0.5 kts)
@@ -133,12 +133,15 @@ Works on all modern browsers:
 
 The application automatically positions labels to avoid overlaps:
 - Measures each rendered label, including its font, padding and border
-- Tries 8 directions at increasing distances, avoiding other labels, all traffic icons, map controls and open popups
-- Keeps labels inside the viewport and preserves previous positions while they remain clear
-- Prioritizes aircraft, then faster traffic; temporarily hides labels that cannot fit without a clash
-- Keeps all markers and their clickable detail popups available, even when their labels are hidden
-- Reconsiders hidden labels after live updates, pan, zoom, resize, popup changes and font loading
+- Tries 16 directions at increasing distances, avoiding other labels, all traffic icons, map controls and open popups
+- Keeps labels inside the viewport where possible and preserves previous positions while they remain clear
+- Prioritizes aircraft, then faster traffic, while keeping every eligible label visible
+- Recalculates placement after live updates, pan, zoom, resize, popup changes and font loading
+- Keeps labels visible during pan and zoom
 - Draws leader lines from label borders toward their markers
+- Prefers non-crossing leader lines with a 2-pixel clearance from other lines and labels
+
+Leader checks also apply to previous positions after markers move. If no clear position is available, the label remains visible at the best available candidate: less box overlap first, then fewer lines through labels, fewer line crossings and shorter leaders. Crowding never hides a label. Labels wider than the viewport start at its edge so as much text as possible stays visible. Existing rules for which objects have labels (such as moving vessels) still apply.
 
 `LABEL_GAP` and `LABEL_EDGE_PADDING` in `app.js` control spacing in pixels. The placement algorithm lives in `label-layout.js` and uses a spatial index to check nearby rectangles. Updates share one animation-frame layout, without a continuous physics simulation or rebuilding every tooltip.
 
@@ -198,9 +201,9 @@ multi-map/
 
 ### Labels overlapping?
 - Hard refresh to ensure the latest JavaScript and CSS are loaded.
-- In crowded areas, some labels are intentionally hidden. Zoom in to make room, or click a marker to read its details.
-- Traffic labels avoid one another; place names baked into map tiles are separate.
-- Check the browser console for JavaScript errors if traffic labels still overlap.
+- Labels always remain visible in crowded areas, so overlaps or line crossings are allowed when no clear position fits. Zoom in to make more room.
+- Placement tries to separate traffic labels; place names baked into map tiles are separate.
+- Check the browser console for JavaScript errors if placement does not update.
 
 ## Tests
 
@@ -210,7 +213,7 @@ Run the regression tests with Node.js 18 or newer (no dependencies to install):
 node --test tests/*.test.js
 ```
 
-Tests cover dense clusters, long names, viewport edges, label priorities, stable movement, resizing, font metrics, panning away and back, popup changes and vessel movement state. The application tests use a small DOM/Leaflet adapter; visual verification in a real browser is still useful.
+Tests cover dense clusters without dropped labels, fallback scoring, long names, viewport edges, label priorities, stable movement, resizing, font metrics, panning away and back, popup changes, vessel movement state, crossing/overlapping leaders and lines passing through labels. The application tests use a small DOM/Leaflet adapter; visual verification in a real browser is still useful.
 
 ### Performance issues?
 - The application is optimized to handle 100+ aircraft/vessels

@@ -149,15 +149,7 @@ html, body {
     margin: 0 !important;
     white-space: nowrap;
     pointer-events: none;
-    visibility: hidden !important;
-}
-
-.managed-label.label-placed {
     visibility: visible !important;
-}
-
-.labels-moving .managed-label {
-    visibility: hidden !important;
 }
 
 .managed-label::before {

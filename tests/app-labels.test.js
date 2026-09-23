@@ -103,6 +103,7 @@ function createApp() {
     }
     const panels = [];
     const context = vm.createContext({
+        MAP_CONFIG: { CARTO_API_KEY: 'test-key' },
         console: { log() {}, warn() {}, error() {} },
         localStorage: { getItem: () => null },
         setTimeout() {}, clearTimeout() {}, setInterval() {},
@@ -142,7 +143,7 @@ test('rendered tooltip boxes agree with planned bounds after a pan and fractiona
     app.map.panY = 50;
     app.flush();
     const placements = app.get('previousLabelPlacements');
-    assert.ok(placements.size > 5);
+    assert.equal(placements.size, 25);
     for (const [id, placement] of placements) {
         const marker = app.get(`aircraftMarkers.get(${JSON.stringify(id.slice(9))})`);
         const bounds = marker.getTooltip().getElement().getBoundingClientRect();
@@ -160,7 +161,8 @@ test('offscreen labels retain their tooltip and return after panning without new
     const marker = app.get("aircraftMarkers.get('A')");
     const tooltip = marker.getTooltip();
     app.map.fire('movestart');
-    assert.ok(app.map.getContainer().classList.contains('labels-moving'));
+    assert.ok(tooltip.getElement().classList.contains('label-placed'));
+    assert.ok(!app.map.getContainer().classList.contains('labels-moving'));
     app.map.panX = 1100;
     app.map.fire('moveend');
     assert.equal(marker.getTooltip(), tooltip);
@@ -203,13 +205,13 @@ test('vessel labels follow movement state and existing vessels update outside th
     assert.ok(marker.getTooltip().getElement().classList.contains('label-placed'));
 });
 
-test('hidden labels reappear when an overlay is closed without any marker updates', () => {
+test('labels remain placed even when an overlay leaves no clear space', () => {
     const app = createApp();
     app.aircraft(); app.flush();
     const tooltip = app.get("aircraftMarkers.get('A').getTooltip()");
     app.panels.push({ getBoundingClientRect: () => ({ left: 55, top: 37, right: 1055, bottom: 737, width: 1000, height: 700 }) });
     app.map.fire('popupopen'); app.flush();
-    assert.ok(!tooltip.getElement().classList.contains('label-placed'));
+    assert.ok(tooltip.getElement().classList.contains('label-placed'));
     app.panels.pop();
     app.map.fire('popupclose'); app.flush();
     assert.ok(tooltip.getElement().classList.contains('label-placed'));

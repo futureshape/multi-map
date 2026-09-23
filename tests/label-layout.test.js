@@ -17,6 +17,49 @@ function assertSeparated(a, b, gap = 6) {
     `Overlapping rectangles: ${JSON.stringify(a)}, ${JSON.stringify(b)}`);
 }
 
+// Independent parametric segment test for checking the returned geometry.
+function segmentsMeet(a, b) {
+    const rx = a.endX - a.startX;
+    const ry = a.endY - a.startY;
+    const sx = b.endX - b.startX;
+    const sy = b.endY - b.startY;
+    const qx = b.startX - a.startX;
+    const qy = b.startY - a.startY;
+    const determinant = rx * sy - ry * sx;
+    const epsilon = 1e-8;
+    if (Math.abs(determinant) > epsilon) {
+        const t = (qx * sy - qy * sx) / determinant;
+        const u = (qx * ry - qy * rx) / determinant;
+        return t >= -epsilon && t <= 1 + epsilon && u >= -epsilon && u <= 1 + epsilon;
+    }
+    if (Math.abs(qx * ry - qy * rx) > epsilon) return false;
+    return Math.max(Math.min(a.startX, a.endX), Math.min(b.startX, b.endX)) <=
+        Math.min(Math.max(a.startX, a.endX), Math.max(b.startX, b.endX)) + epsilon &&
+        Math.max(Math.min(a.startY, a.endY), Math.min(b.startY, b.endY)) <=
+        Math.min(Math.max(a.startY, a.endY), Math.max(b.startY, b.endY)) + epsilon;
+}
+
+function assertLeadersClear(placements) {
+    const entries = [...placements.values()];
+    entries.forEach(({ leader }, i) => {
+        entries.forEach(({ rect, leader: other }, j) => {
+            if (i === j) return;
+            assert.ok(!segmentsMeet(leader, other), 'Leader lines cross, touch or overlap');
+            for (const [startX, startY, endX, endY] of [
+                [rect.left, rect.top, rect.right, rect.top],
+                [rect.right, rect.top, rect.right, rect.bottom],
+                [rect.right, rect.bottom, rect.left, rect.bottom],
+                [rect.left, rect.bottom, rect.left, rect.top]
+            ]) {
+                assert.ok(!segmentsMeet(leader, { startX, startY, endX, endY }),
+                    'Leader passes through another label');
+            }
+            const inside = (x, y) => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+            assert.ok(!inside(leader.startX, leader.startY) && !inside(leader.endX, leader.endY));
+        });
+    });
+}
+
 function assertClear(placements, obstacles = [], bounds = viewport) {
     const rectangles = [...placements.values()].map(p => p.rect);
     rectangles.forEach((rect, i) => {
@@ -25,17 +68,29 @@ function assertClear(placements, obstacles = [], bounds = viewport) {
         rectangles.slice(i + 1).forEach(other => assertSeparated(rect, other));
         obstacles.forEach(other => assertSeparated(rect, other));
     });
+    assertLeadersClear(placements);
 }
 
-test('dense mixed traffic is decluttered without hiding every label', () => {
+function assertOnscreen(placements, bounds = viewport) {
+    for (const { rect, leader } of placements.values()) {
+        for (const value of [...Object.values(rect), ...Object.values(leader)]) assert.ok(Number.isFinite(value));
+        assert.ok(rect.left >= 0 && rect.top >= 0);
+        assert.ok(rect.left < bounds.width && rect.top < bounds.height);
+        if (rect.right - rect.left <= bounds.width) assert.ok(rect.right <= bounds.width);
+        else assert.equal(rect.left, 0, 'Oversized text should start at the visible edge');
+        if (rect.bottom - rect.top <= bounds.height) assert.ok(rect.bottom <= bounds.height);
+        else assert.equal(rect.top, 0);
+    }
+}
+
+test('dense mixed traffic keeps every label visible even when clashes are unavoidable', () => {
     const labels = Array.from({ length: 100 }, (_, i) => makeLabel(`traffic-${i}`,
         460 + i % 5 * 12, 340 + Math.floor(i / 5) * 3,
         { type: i % 2 ? 'vessel' : 'aircraft', width: 75 + i % 7 * 15 }));
     const obstacles = labels.map(iconRect);
     const placements = place(labels, { ...viewport, obstacles });
-    assert.ok(placements.size >= 10, `Only ${placements.size} labels fit`);
-    assert.ok(placements.size < labels.length);
-    assertClear(placements, obstacles);
+    assert.equal(placements.size, labels.length);
+    assertOnscreen(placements);
 });
 
 test('long label bounds are checked even when centers are over 200px apart', () => {
@@ -95,16 +150,40 @@ test('higher-priority labels get scarce space independent of insertion order', (
     const low = makeLabel('low', 30, 35, { priority: 1 });
     const high = makeLabel('high', 30, 35, { priority: 1000 });
     const placements = place([low, high], { ...options, obstacles: [iconRect(high)] });
-    assert.deepEqual([...placements.keys()], ['high']);
+    assert.deepEqual([...placements.keys()], ['high', 'low']);
+    const highOnly = place([high], { ...options, obstacles: [iconRect(high)] });
+    assert.deepEqual(placements.get('high'), highOnly.get('high'));
+    assertOnscreen(placements, options);
 });
 
-test('blocked, oversized and offscreen labels are hidden; they return when space opens', () => {
+test('blocked and oversized labels stay visible; offscreen markers need no placement', () => {
     const label = makeLabel('returning', 300, 300);
     const blocked = place([label], { ...viewport, obstacles: [{ left: 0, top: 0, right: 1024, bottom: 768 }] });
-    assert.equal(blocked.size, 0);
-    assert.equal(place([{ ...label, width: 2000 }], viewport).size, 0);
+    assert.equal(blocked.size, 1);
+    assertOnscreen(blocked);
+    const oversized = place([{ ...label, width: 2000 }], viewport);
+    assert.equal(oversized.size, 1);
+    assertOnscreen(oversized);
     assert.equal(place([{ ...label, x: -20 }], viewport).size, 0);
     assert.equal(place([label], { ...viewport, previous: blocked }).size, 1);
+});
+
+test('fallback minimizes overlap instead of blindly using the default position', () => {
+    const label = makeLabel('blocked', 500, 300);
+    const defaultPosition = { left: 528, top: 288, right: 628, bottom: 312 };
+    // Every candidate hits the first obstacle. The default also hits the
+    // second obstacle, so another direction must win the fallback scoring.
+    const obstacles = [{ left: 0, top: 0, right: 1024, bottom: 768 }, defaultPosition];
+    const placements = place([label], { ...viewport, obstacles, distances: [12] });
+    assert.equal(placements.size, 1);
+    assertSeparated(placements.get(label.id).rect, defaultPosition);
+    assertOnscreen(placements);
+});
+
+test('even an empty candidate configuration keeps a label visible', () => {
+    const placements = place([makeLabel('no-candidates', 500, 300)], { ...viewport, distances: [] });
+    assert.equal(placements.size, 1);
+    assertOnscreen(placements);
 });
 
 test('a resized viewport never reuses a placement beyond its new edges', () => {
@@ -127,9 +206,100 @@ test('leader ends touch their own label border and point back toward their marke
     assert.ok(leader.endY >= rect.top && leader.endY <= rect.bottom);
 });
 
-test('randomized mixed sizes, priorities and screen dimensions preserve all clearances', () => {
+test('the crossing vessel leaders from the screenshot are repositioned without hiding a label', () => {
+    const labels = [
+        makeLabel('ELIZABETHAN', 253, 340, { width: 192, height: 48, type: 'vessel' }),
+        makeLabel('GOLDEN JUBILEE', 218, 327, { width: 228, height: 48, type: 'vessel' }),
+        makeLabel('TYPHOON CLIPPER', 301, 362, { width: 250, height: 48, type: 'vessel' })
+    ];
+    const previous = new Map([
+        ['ELIZABETHAN', { dx: 156 - 253, dy: 136 - 340 }],
+        ['GOLDEN JUBILEE', { dx: 371 - 218, dy: 128 - 327 }],
+        ['TYPHOON CLIPPER', { dx: 277 - 301, dy: 222 - 362 }]
+    ]);
+    assert.ok(segmentsMeet(
+        { startX: 253, startY: 324, endX: 253, endY: 184 },
+        { startX: 230, startY: 315, endX: 371, endY: 176 }
+    ));
+    const bounds = { width: 690, height: 602 };
+    const obstacles = labels.map(iconRect);
+    const placements = place(labels, { ...bounds, obstacles, previous });
+    assert.equal(placements.size, 3);
+    assertClear(placements, obstacles, bounds);
+    assert.notDeepEqual(
+        { dx: placements.get('GOLDEN JUBILEE').dx, dy: placements.get('GOLDEN JUBILEE').dy },
+        previous.get('GOLDEN JUBILEE')
+    );
+});
+
+test('a later label avoids covering an accepted leader when alternatives exist', () => {
+    const labels = [makeLabel('A', 100, 100, { width: 40 }), makeLabel('B', 200, 200, { width: 40 })];
+    const previous = new Map([['A', { dx: 200, dy: -12 }], ['B', { dx: -20, dy: -112 }]]);
+    const placements = place(labels, { ...viewport, previous });
+    assert.equal(placements.size, 2);
+    assertClear(placements);
+});
+
+test('a new leader avoids passing through an accepted label when alternatives exist', () => {
+    const labels = [makeLabel('A', 300, 100, { width: 40 }), makeLabel('B', 100, 200, { width: 40 })];
+    const previous = new Map([['A', { dx: -120, dy: 88 }], ['B', { dx: 200, dy: -12 }]]);
+    const placements = place(labels, { ...viewport, previous });
+    assert.equal(placements.size, 2);
+    assertClear(placements);
+});
+
+test('crossing leaders are allowed as a last resort but avoided when alternatives exist', () => {
+    const labels = [makeLabel('A', 100, 100, { width: 40 }), makeLabel('B', 180, 50, { width: 24 })];
+    const previous = new Map([['A', { dx: 140, dy: -12 }], ['B', { dx: -12, dy: 100 }]]);
+    const obstacles = labels.map(iconRect);
+    const forced = place(labels, { ...viewport, previous, obstacles, distances: [] });
+    assert.equal(forced.size, 2);
+    assert.ok(segmentsMeet(forced.get('A').leader, forced.get('B').leader));
+    const alternatives = place(labels, { ...viewport, previous, obstacles });
+    assert.equal(alternatives.size, 2);
+    assertClear(alternatives, obstacles);
+});
+
+test('diagonal leaders with overlapping bounding boxes can still fit side by side', () => {
+    const labels = [makeLabel('A', 100, 100, { width: 40 }), makeLabel('B', 100, 150, { width: 40 })];
+    const previous = new Map(labels.map(label => [label.id, { dx: 100, dy: 100 }]));
+    const placements = place(labels, { ...viewport, previous, distances: [] });
+    assert.equal(placements.size, 2);
+    assertClear(placements);
+});
+
+test('collinear overlapping leaders and strokes only one pixel apart prefer clear alternatives', () => {
+    for (const separation of [0, 1]) {
+        const labels = [makeLabel('A', 100, 100, { width: 40 }),
+            makeLabel('B', 170, 100 + separation, { width: 40 })];
+        const previous = new Map([['A', { dx: 100, dy: -12 }], ['B', { dx: -140, dy: -12 }]]);
+        const obstacles = labels.map(iconRect);
+        const placements = place(labels, { ...viewport, previous, obstacles });
+        assert.equal(placements.size, 2);
+        assertClear(placements, obstacles);
+    }
+});
+
+test('separate collinear leaders remain visible', () => {
+    const labels = [makeLabel('A', 100, 100, { width: 40 }), makeLabel('B', 400, 100, { width: 40 })];
+    const previous = new Map(labels.map(label => [label.id, { dx: 100, dy: -12 }]));
+    const placements = place(labels, { ...viewport, previous, distances: [] });
+    assert.equal(placements.size, 2);
+    assertClear(placements);
+});
+
+test('moving markers revalidate old leaders even when both label boxes still fit', () => {
+    const labels = [makeLabel('A', 250, 300, { width: 80 }), makeLabel('B', 400, 300, { width: 80 })];
+    const previous = new Map([['A', { dx: -40, dy: -120 }], ['B', { dx: -40, dy: -120 }]]);
+    const first = place(labels, { ...viewport, previous, obstacles: labels.map(iconRect) });
+    const moved = [labels[0], { ...labels[1], x: 210, y: 240 }];
+    const next = place(moved, { ...viewport, previous: first, obstacles: moved.map(iconRect) });
+    assert.equal(next.size, 2);
+    assertClear(next, moved.map(iconRect));
+});
+
+test('randomized mixed sizes, priorities and screen dimensions never drop an onscreen label', () => {
     let seed = 12345;
-    let visible = 0;
     const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32);
     for (let scene = 0; scene < 30; scene++) {
         const bounds = { width: 320 + Math.floor(random() * 1200), height: 240 + Math.floor(random() * 700) };
@@ -140,8 +310,7 @@ test('randomized mixed sizes, priorities and screen dimensions preserve all clea
             }));
         const obstacles = labels.map(iconRect);
         const placements = place(labels, { ...bounds, obstacles });
-        visible += placements.size;
-        assertClear(placements, obstacles, bounds);
+        assert.equal(placements.size, labels.length);
+        assertOnscreen(placements, bounds);
     }
-    assert.ok(visible > 100);
 });

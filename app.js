@@ -115,7 +115,7 @@ let labelLayoutFrame = null;
 let previousLabelPlacements = new Map();
 let mapIsMoving = false;
 
-// Keep one tooltip per eligible marker, including labels hidden by decluttering.
+// Keep one tooltip per eligible marker, even in crowded areas.
 // Text content avoids interpreting callsigns and vessel names as HTML.
 function updateMarkerLabel(marker, text, type) {
     if (!text) {
@@ -704,16 +704,14 @@ function init() {
     // Connect to AIS Socket.IO
     connectAISSocket();
 
-    // Intermediate zoom transforms invalidate measured screen bounds. Place
-    // labels as soon as movement ends, retaining their bindings while hidden.
+    // Keep labels visible using Leaflet's movement/zoom transforms, then
+    // recalculate screen-space placement as soon as movement ends.
     map.on('movestart', () => {
         mapIsMoving = true;
-        map.getContainer().classList.add('labels-moving');
     });
     map.on('moveend', () => {
         mapIsMoving = false;
         recalculateLabels();
-        map.getContainer().classList.remove('labels-moving');
     });
     map.on('resize popupopen popupclose', scheduleLabelLayout);
     if (document.fonts) {
