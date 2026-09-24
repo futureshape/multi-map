@@ -205,11 +205,12 @@ function recalculateLabels() {
         // reliable width estimate, and screen-space text does not scale at zoom.
         const bounds = element.getBoundingClientRect();
         const iconSize = marker.options.icon.options.iconSize;
+        const isAircraftDot = marker.options.icon.options.className?.includes('aircraft-dot-wrapper');
         labels.push({
             id, type, marker, tooltip, element,
             x: point.x, y: point.y,
             width: Math.ceil(bounds.width), height: Math.ceil(bounds.height),
-            radius: Math.max(iconSize[0], iconSize[1]) / 2,
+            radius: isAircraftDot ? 6 : Math.max(iconSize[0], iconSize[1]) / 2,
             priority: (type === 'aircraft' ? 1000 : 0) + (marker.speed || 0),
             // Leaflet rounds half of offsetWidth/Height when centering tooltips.
             halfWidth: Math.round(element.offsetWidth / 2),
@@ -250,7 +251,17 @@ function recalculateLabels() {
 }
 
 // Create custom aircraft icon using Font Awesome
-function createAircraftIcon(heading = 0) {
+function createAircraftIcon(heading) {
+    if (heading === undefined || heading === null || !Number.isFinite(Number(heading))) {
+        return L.divIcon({
+            html: '<div class="aircraft-marker aircraft-dot"></div>',
+            className: 'aircraft-icon-wrapper aircraft-dot-wrapper',
+            iconSize: [16, 16],
+            iconAnchor: [8, 8],
+            popupAnchor: [0, -8]
+        });
+    }
+
     // Font Awesome plane points right (90°), so subtract 90 to make 0° point north
     const adjustedHeading = heading - 90;
 
@@ -384,10 +395,9 @@ function updateAircraftMarker(aircraft) {
     }
 
     const position = [aircraft.lat, aircraft.lon];
-    // Use true_heading, fallback to mag_heading, then calc_track, default to 0
-    const heading = aircraft.true_heading !== undefined ? aircraft.true_heading :
-                    aircraft.mag_heading !== undefined ? aircraft.mag_heading :
-                    aircraft.calc_track !== undefined ? aircraft.calc_track : 0;
+    // Prefer true heading, then magnetic heading, then calculated track.
+    const heading = [aircraft.true_heading, aircraft.mag_heading, aircraft.calc_track]
+        .find(value => value !== undefined && value !== null && Number.isFinite(Number(value)));
 
     const labelText = aircraft.flight ? aircraft.flight.trim() : '';
 

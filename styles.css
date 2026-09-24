@@ -116,6 +116,15 @@ html, body {
     filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.3));
 }
 
+.aircraft-marker.aircraft-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #4CAF50;
+    border: 1px solid rgba(0, 0, 0, 0.8);
+    box-shadow: 0 0 4px rgba(76, 175, 80, 0.7);
+}
+
 /* Tooltip labels for aircraft */
 .aircraft-label-tooltip {
     background-color: rgba(26, 26, 26, 0.9) !important;
